@@ -21,9 +21,10 @@
             "tsConfig": "tsconfig.app.json",
             "assets": [
               {
-                "glob": "_redirects",
+                "glob": "**/*",
                 "input": "public"                
-              }
+              },
+              "_redirects"
             ],
             "styles": [
               "src/styles.css"
