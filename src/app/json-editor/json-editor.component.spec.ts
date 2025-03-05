@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { JsonEditorComponent } from './json-editor.component';
+import { provideExperimentalZonelessChangeDetection } from '@angular/core';
 
 describe('JsonEditorComponent', () => {
   let component: JsonEditorComponent;
@@ -8,13 +9,15 @@ describe('JsonEditorComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [JsonEditorComponent]
+      imports: [JsonEditorComponent],
+      providers: [provideExperimentalZonelessChangeDetection()],
+      
     })
     .compileComponents();
 
     fixture = TestBed.createComponent(JsonEditorComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await fixture.whenStable();
   });
 
   it('should create', () => {
