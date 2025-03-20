@@ -15,7 +15,15 @@ export class ParserService {
   }
 
   parseJson(json: any): void {
-    this.nodeIdCounter = 0;  // Reset ID counter **only** when parsing new JSON
+    if (typeof json === 'string') {
+      try {
+        json = JSON.parse(json);
+      } catch (error) {
+        console.error('Invalid JSON', error);
+        return;
+      }
+    }
+    this.nodeIdCounter = 0;
     const graph = this.buildGraph(json);
     this.graphSignal.set(graph);
   }
