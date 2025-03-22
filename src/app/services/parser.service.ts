@@ -1,84 +1,97 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable } from '@angular/core';
 
-// Define interfaces for graph structure
-interface GraphNode { id: string; label: string; }
-interface GraphEdge { source: string; target: string; label?: string; }
-interface GraphData { nodes: GraphNode[]; edges: GraphEdge[]; }
+interface GraphNode {
+  id: string;
+  label: string;
+}
 
-@Injectable({ providedIn: 'root' })
+interface GraphEdge {
+  source: string;
+  target: string;
+  label?: string; // Optional edge label
+}
+
+interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+@Injectable({
+  providedIn: 'root'
+})
 export class ParserService {
-  private readonly graphSignal = signal<GraphData>({ nodes: [], edges: [] });
-  private nodeIdCounter = 0;  // Ensure this persists across calls
+  private nodes: GraphNode[] = [];
+  private edges: GraphEdge[] = [];
+  private nodeIdCounter = 0;
 
-  get graph(): () => GraphData {
-    return this.graphSignal;
+  constructor() { }
+
+  parseJson(jsonString: string): void {
+    try {
+      const json = JSON.parse(jsonString);
+      this.nodeIdCounter = 0; // Reset counter
+      this.nodes = [];       // Clear previous data
+      this.edges = [];       // Clear previous data
+      const rootId = this.addNode('Object'); // Start with "Object" root
+      this.processValue(json, rootId);
+    } catch (error) {
+      console.error("Invalid JSON:", error);
+      // Handle invalid JSON (e.g., show an error message to the user)
+    }
   }
 
-  parseJson(json: any): void {
-    if (typeof json === 'string') {
-      try {
-        json = JSON.parse(json);
-      } catch (error) {
-        console.error('Invalid JSON', error);
-        return;
+  private addNode(label: string): string {
+    const id = `node-${this.nodeIdCounter++}`;
+    this.nodes.push({ id, label });
+    return id;
+  }
+
+  private processValue(value: any, parentId: string, key?: string): void {
+    if (typeof value === 'object' && value !== null) {
+      if (Array.isArray(value)) {
+        const arrayNodeId = this.addNode(`Array (${value.length})`);
+        if (key) {
+          this.edges.push({ source: parentId, target: arrayNodeId, label: key });
+        } else {
+          this.edges.push({ source: parentId, target: arrayNodeId }); // No key for root
+        }
+        value.forEach((item, index) => {
+          this.processValue(item, arrayNodeId, String(index));  // Index as key
+        });
+
+      } else { // Regular object
+        const objectNodeId = this.addNode('Object');
+        if(key){
+          this.edges.push({ source: parentId, target: objectNodeId, label: key });
+        } else {
+          this.edges.push({source: parentId, target: objectNodeId});
+        }
+
+        for (const objectKey in value) {
+          if (value.hasOwnProperty(objectKey)) { //For in can give inherited props
+            this.processValue(value[objectKey], objectNodeId, objectKey);
+          }
+        }
+      }
+    } else {
+      // Primitive value (string, number, boolean, null)
+      const primitiveNodeId = this.addNode(String(value));
+      if(key) {
+        this.edges.push({ source: parentId, target: primitiveNodeId, label: key });
+      } else {
+        this.edges.push({source: parentId, target: primitiveNodeId});
       }
     }
+  }
+
+
+  graph(): GraphData {
+    return { nodes: this.nodes, edges: this.edges };
+  }
+
+  reset(): void {  // Add a reset method
+    this.nodes = [];
+    this.edges = [];
     this.nodeIdCounter = 0;
-    const graph = this.buildGraph(json);
-    this.graphSignal.set(graph);
-  }
-
-  private buildGraph(json: any): GraphData {
-    const nodes: GraphNode[] = [];
-    const edges: GraphEdge[] = [];
-    const idMap = new Map<string, string>(); // Ensure key uniqueness
-
-    const traverse = (value: any, parentId: string | null, edgeLabel: string | null) => {
-      if (value !== null && typeof value === 'object') {
-        if (Array.isArray(value)) {
-          const arrayNodeId = this.generateId();
-          nodes.push({ id: arrayNodeId, label: `Array (${value.length})` });
-
-          if (parentId) {
-            edges.push({ source: parentId, target: arrayNodeId, label: edgeLabel ?? undefined });
-          }
-
-          value.forEach((elem, index) => {
-            traverse(elem, arrayNodeId, index.toString());
-          });
-        } else {
-          const objectNodeId = this.generateId();
-          nodes.push({ id: objectNodeId, label: 'Object' });
-
-          if (parentId) {
-            edges.push({ source: parentId, target: objectNodeId, label: edgeLabel ?? undefined });
-          }
-
-          Object.entries(value).forEach(([key, val]) => {
-            if (!idMap.has(key)) {
-              idMap.set(key, this.generateId()); // Store a unique ID for this key
-            }
-            const keyNodeId = idMap.get(key)!;
-            nodes.push({ id: keyNodeId, label: key });
-
-            edges.push({ source: objectNodeId, target: keyNodeId });
-            traverse(val, keyNodeId, null);
-          });
-        }
-      } else {
-        const valueNodeId = this.generateId();
-        nodes.push({ id: valueNodeId, label: String(value) });
-        if (parentId) {
-          edges.push({ source: parentId, target: valueNodeId, label: edgeLabel ?? undefined });
-        }
-      }
-    };
-
-    traverse(json, null, null);
-    return { nodes, edges };
-  }
-
-  private generateId(): string {
-    return `node-${this.nodeIdCounter++}`;
   }
 }
